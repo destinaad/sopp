@@ -4,29 +4,6 @@ import KpayRow from "@/components/shared/KpayRow";
 import { IconPlus } from "@/components/ui/Icon";
 import { formatRupiah } from "@/utils/formatRupiah";
 
-/**
- * Section "Rincian Setoran" di halaman Input Setoran: Transfer, QRIS, Tunai, KPAY.
- * Tiap kategori punya state baris sendiri-sendiri (transferRows, qrisRows, dst),
- * makanya state dikelola di sini (bukan di page) supaya page-nya tetap ringkas.
- *
- * `onTotalChange` (opsional): dipanggil setiap kali subtotal gabungan
- * (Transfer + QRIS + Tunai + KPAY) berubah, supaya page bisa menampilkan
- * "Total Setor" yang benar-benar hidup di RingkasanOtomatis.
- *
- * `onRowsChange` (opsional, BARU): dipanggil setiap kali salah satu dari
- * 4 array baris berubah (tambah/edit/hapus baris, ubah nominal/keterangan/
- * bukti/verified) — mengirim SELURUH isi { transfer, qris, tunai, kpay }
- * ke parent. Ini "jembatan ekspor data" supaya InputSetoran.jsx (parent)
- * bisa mengumpulkan data form untuk dikirim ke saveDraft/submit, TANPA
- * perlu memindahkan (lift up) state ini ke parent — state tetap hidup di
- * sini seperti sebelumnya, cuma sekarang "dilaporkan" juga ke atas.
- *
- * `initialData` (opsional): {transfer, qris, tunai, kpay} — array baris siap
- * pakai untuk MENGISI ULANG form dengan data yang sudah ada. Dipakai saat
- * komponen ini dipanggil dari mode Edit di DetailSetoran.jsx (data lama teller
- * perlu tampil terisi, bukan form kosong seperti di Input Setoran baru).
- * Kalau tidak dikirim, perilakunya sama seperti sebelumnya (form kosong).
- */
 export default function RincianSetoran({ onTotalChange, onRowsChange, initialData }) {
   const [transferRows, setTransferRows] = useState(
     initialData?.transfer ?? [{ id: 1, keterangan: "", nominal: "", bukti: null, verified: false }]

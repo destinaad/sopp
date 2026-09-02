@@ -61,6 +61,15 @@ export default {
         xl:  '12px',
         full:'9999px',
       },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0' },
+          to:   { opacity: '1' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.25s ease-out',
+      },
     },
   },
   plugins: [],

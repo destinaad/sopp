@@ -3,22 +3,24 @@ import Modal from "@/components/ui/Modal";
 import { IconBankTransfer, IconQrCode, IconWallet, IconKpay, IconEye } from "@/components/ui/Icon";
 import { formatRupiah } from "@/utils/formatRupiah";
 
-/**
- * [DETAIL] Satu baris bukti. `label` opsional (dipakai Transfer untuk nomor
- * urut "#1"/"#2" karena transaksinya banyak & mirip-mirip, perlu pembeda) —
- * QRIS/Tunai cukup nominal + Lihat Bukti saja, tanpa label deskriptif.
- */
-function BuktiItem({ label, nominal, onLihat }) {
+function BuktiItem({ label, nominal, fotoUrl, onLihat }) {
   return (
     <div className="flex items-center justify-between bg-[#f7f7f6] rounded px-4 py-3">
       <span className="text-sm text-[#191c20]">
         {label && <span className="text-[#727782]">{label} </span>}
         <span className="font-semibold">{formatRupiah(nominal)}</span>
       </span>
-      <button onClick={onLihat} className="flex items-center gap-1 text-[#710014] text-xs font-semibold hover:opacity-80 transition-opacity">
-        Lihat Bukti
-        <IconEye className="size-3.5" />
-      </button>
+      {/* Tombol "Lihat Bukti" hanya muncul kalau foto_bukti_url tidak null
+          — kontrak §3.2: kpay biasanya null, jangan render tombol kosong */}
+      {fotoUrl && (
+        <button
+          onClick={onLihat}
+          className="flex items-center gap-1 text-[#710014] text-xs font-semibold hover:opacity-80 transition-opacity"
+        >
+          Lihat Bukti
+          <IconEye className="size-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -33,12 +35,20 @@ function SectionLabel({ icon, children }) {
 }
 
 /**
- * [DETAIL] Kartu "Rincian Lampiran": daftar bukti Transfer/QRIS/Tunai, plus
- * tabel Nama/Nominal untuk KPAY. Klik "Lihat Bukti" membuka modal preview
- * (sementara placeholder, karena upload file sungguhan belum ada).
+ * Menerima entries[] flat dari response API GET /teller/setoran/{id}
+ * (bukan shape mock lama { transfer, qris, tunai, kpayKaryawan }).
+ * Klik "Lihat Bukti" membuka modal dengan <img> langsung dari foto_bukti_url
+ * — URL ini sudah siap pakai sebagai src, tidak perlu diproses lagi (kontrak §2).
  */
-export default function RincianLampiran({ lampiran }) {
-  const [modalLabel, setModalLabel] = useState(null);
+export default function RincianLampiran({ entries = [] }) {
+  // { url: string, label: string } | null
+  const [modalBukti, setModalBukti] = useState(null);
+
+  // Pisahkan entries[] flat berdasarkan metode_pembayaran
+  const transfer = entries.filter((e) => e.metode_pembayaran === "transfer");
+  const qris     = entries.filter((e) => e.metode_pembayaran === "qris");
+  const tunai    = entries.filter((e) => e.metode_pembayaran === "tunai");
+  const kpay     = entries.filter((e) => e.metode_pembayaran === "kpay");
 
   return (
     <>
@@ -48,53 +58,112 @@ export default function RincianLampiran({ lampiran }) {
         </div>
 
         <div className="flex flex-col gap-5 p-5">
+          {/* Transfer */}
           <div className="flex flex-col gap-2">
-            <SectionLabel icon={<IconBankTransfer className="size-4" color="#710014" />}>Transfer</SectionLabel>
-            {lampiran.transfer.map((item) => (
-              <BuktiItem key={item.label} label={item.label} nominal={item.nominal} onLihat={() => setModalLabel(`Transfer ${item.label}`)} />
-            ))}
+            <SectionLabel icon={<IconBankTransfer className="size-4" color="#710014" />}>
+              Transfer
+            </SectionLabel>
+            {transfer.length === 0 ? (
+              <p className="text-[#9ca3af] text-xs italic">Tidak ada transaksi transfer.</p>
+            ) : (
+              transfer.map((item, i) => (
+                <BuktiItem
+                  key={item.id}
+                  label={`#${i + 1}`}
+                  nominal={item.nominal}
+                  fotoUrl={item.foto_bukti_url}
+                  onLihat={() => setModalBukti({ url: item.foto_bukti_url, label: `Transfer #${i + 1}` })}
+                />
+              ))
+            )}
           </div>
 
+          {/* QRIS */}
           <div className="flex flex-col gap-2">
-            <SectionLabel icon={<IconQrCode className="size-4" color="#710014" />}>QRIS</SectionLabel>
-            {lampiran.qris.map((item, i) => (
-              <BuktiItem key={`qr-${i}`} nominal={item.nominal} onLihat={() => setModalLabel(`QRIS #${i + 1}`)} />
-            ))}
+            <SectionLabel icon={<IconQrCode className="size-4" color="#710014" />}>
+              QRIS
+            </SectionLabel>
+            {qris.length === 0 ? (
+              <p className="text-[#9ca3af] text-xs italic">Tidak ada transaksi QRIS.</p>
+            ) : (
+              qris.map((item, i) => (
+                <BuktiItem
+                  key={item.id}
+                  nominal={item.nominal}
+                  fotoUrl={item.foto_bukti_url}
+                  onLihat={() => setModalBukti({ url: item.foto_bukti_url, label: `QRIS #${i + 1}` })}
+                />
+              ))
+            )}
           </div>
 
+          {/* Tunai */}
           <div className="flex flex-col gap-2">
-            <SectionLabel icon={<IconWallet className="size-4" color="#710014" />}>Tunai</SectionLabel>
-            {lampiran.tunai.map((item, i) => (
-              <BuktiItem key={`tu-${i}`} nominal={item.nominal} onLihat={() => setModalLabel(`Tunai #${i + 1}`)} />
-            ))}
+            <SectionLabel icon={<IconWallet className="size-4" color="#710014" />}>
+              Tunai
+            </SectionLabel>
+            {tunai.length === 0 ? (
+              <p className="text-[#9ca3af] text-xs italic">Tidak ada transaksi tunai.</p>
+            ) : (
+              tunai.map((item, i) => (
+                <BuktiItem
+                  key={item.id}
+                  nominal={item.nominal}
+                  fotoUrl={item.foto_bukti_url}
+                  onLihat={() => setModalBukti({ url: item.foto_bukti_url, label: `Tunai #${i + 1}` })}
+                />
+              ))
+            )}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <SectionLabel icon={<IconKpay className="size-4" color="#710014" />}>KPAY</SectionLabel>
-            <p className="text-[#9ca3af] text-xs italic">"{lampiran.kpayKeterangan}"</p>
-            <div className="border border-[#efefed] rounded-lg overflow-hidden">
-              <div className="flex justify-between bg-[#f9fafb] px-3 py-2 border-b border-[#efefed]">
-                <span className="font-semibold text-[#727782] text-xs">Nama</span>
-                <span className="font-semibold text-[#727782] text-xs">Nominal</span>
-              </div>
-              {lampiran.kpayKaryawan.map((k, i) => (
-                <div
-                  key={k.nik}
-                  className={`flex justify-between px-3 py-2.5 ${i < lampiran.kpayKaryawan.length - 1 ? "border-b border-[#efefed]" : ""}`}
-                >
-                  <span className="text-[#374151] text-sm">{k.nama}</span>
-                  <span className="text-[#191c20] text-sm font-semibold tabular-nums">{formatRupiah(k.nominal ?? 0)}</span>
+          {/* KPay */}
+          {kpay.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <SectionLabel icon={<IconKpay className="size-4" color="#710014" />}>
+                KPAY
+              </SectionLabel>
+              <div className="border border-[#efefed] rounded-lg overflow-hidden">
+                <div className="flex justify-between bg-[#f9fafb] px-3 py-2 border-b border-[#efefed]">
+                  <span className="font-semibold text-[#727782] text-xs">Nama</span>
+                  <span className="font-semibold text-[#727782] text-xs">Nominal</span>
                 </div>
-              ))}
+                {kpay.map((k, i) => (
+                  <div
+                    key={k.id}
+                    className={`flex justify-between px-3 py-2.5 ${i < kpay.length - 1 ? "border-b border-[#efefed]" : ""}`}
+                  >
+                    <span className="text-[#374151] text-sm">{k.nama_karyawan}</span>
+                    <span className="text-[#191c20] text-sm font-semibold tabular-nums">
+                      {formatRupiah(k.nominal)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {modalLabel && (
-        <Modal title={`Bukti — ${modalLabel}`} onClose={() => setModalLabel(null)}>
-          <div className="bg-[#f3f4f6] rounded-lg h-52 flex items-center justify-center text-[#9ca3af] text-sm">
-            Preview bukti tidak tersedia
+      {/* Modal preview foto — src langsung dari foto_bukti_url (kontrak §2:
+          URL ini sudah final, FE tidak perlu proses apapun) */}
+      {modalBukti && (
+        <Modal title={`Bukti — ${modalBukti.label}`} onClose={() => setModalBukti(null)}>
+          <img
+            src={modalBukti.url}
+            alt={`Bukti ${modalBukti.label}`}
+            className="w-full rounded-lg object-contain max-h-[70vh]"
+            onError={(e) => {
+              // Foto ada di DB tapi file fisik hilang dari server (kontrak §4.2)
+              // atau akses ditolak — ganti dengan pesan, jangan biarkan broken image
+              e.target.style.display = "none";
+              e.target.nextSibling.style.display = "flex";
+            }}
+          />
+          <div
+            style={{ display: "none" }}
+            className="bg-[#f3f4f6] rounded-lg h-52 flex items-center justify-center text-[#9ca3af] text-sm"
+          >
+            Foto tidak dapat dimuat.
           </div>
         </Modal>
       )}

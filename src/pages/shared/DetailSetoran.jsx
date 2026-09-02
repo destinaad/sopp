@@ -1,92 +1,127 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/store/authStore";
 import DetailSetoranHeader from "@/components/shared/DetailSetoranHeader";
 import PendapatanTable from "@/components/shared/PendapatanTable";
 import RingkasanSetoranCard from "@/components/shared/RingkasanSetoranCard";
 import RincianLampiran from "@/components/shared/RincianLampiran";
 import RincianSetoran from "@/components/shared/RincianSetoran";
 import KeteranganTellerCard from "@/components/shared/KeteranganTellerCard";
-import { IconSend } from "@/components/ui/Icon";
+import { IconSend, IconSpinner } from "@/components/ui/Icon";
 import useDetailSetoran from "@/hooks/useDetailSetoran";
-import { IconSpinner } from "@/components/ui/icon";
+import { updateSetoran } from "@/api/teller";
+import { buildSetoranFormData } from "@/utils/buildSetoranFormData";
+import Toast from "@/components/ui/Toast";
 
 /**
- * Ubah data lampiran (bentuk read-only: label/buktiUrl) jadi bentuk baris
- * form RincianSetoran (bentuk edit: keterangan/bukti/verified) supaya form
- * edit terisi data yang sudah ada, bukan form kosong.
- *
- * `verified: true` dipakai sebagai default karena data ini sudah pernah
- * disubmit sebelumnya (dianggap sudah pernah dicek) — teller/Bu Wiwik tetap
- * bisa batalkan centangnya manual kalau memang perlu diverifikasi ulang.
- *
- * `bukti` di sini baru berupa nama file placeholder (bukan file asli),
- * karena mock belum menyimpan metadata file sungguhan dari backend.
+ * Menerjemahkan entries[] dari respons GET/PUT Detail Setoran jadi bentuk
+ * { transfer, qris, tunai, kpay } yang dipakai RincianSetoran.jsx.
+ * entryId disimpan terpisah dari id (key lokal React) — sama pola dengan
+ * entriesKeRincian di pages/teller/InputSetoran.jsx.
  */
-function lampiranKeRincianAwal(lampiran) {
-  const toRow = (item, i) => ({
-    id: i + 1,
-    keterangan: item.label,
-    nominal: String(item.nominal),
-    bukti: item.buktiUrl ? `${item.label.replace(/\s+/g, "_")}.jpg` : null,
-    verified: true,
-  });
-
-  return {
-    transfer: lampiran.transfer.map(toRow),
-    qris: lampiran.qris.map(toRow),
-    tunai: lampiran.tunai.map(toRow),
-    kpay: lampiran.kpayKaryawan.map((k, i) => ({
-      id: i + 1,
-      nama: k.nama,
-      nik: k.nik,
-      keterangan: lampiran.kpayKeterangan,
-      nominal: String(k.nominal ?? 0),
-      bukti: null,
-      verified: true,
-    })),
-  };
+function entriesKeRincianEdit(entries) {
+  const rincian = { transfer: [], qris: [], tunai: [], kpay: [] };
+  for (const entry of entries ?? []) {
+    const baris = {
+      id: entry.id,
+      entryId: entry.id,
+      keterangan: entry.keterangan ?? "",
+      nominal: String(entry.nominal),
+      bukti: entry.foto_bukti_url,
+      verified: entry.is_konfirmasi,
+    };
+    if (entry.metode_pembayaran === "kpay") {
+      baris.nama = entry.nama_karyawan;
+      baris.nik = entry.identitas_karyawan;
+      rincian.kpay.push(baris);
+    } else if (rincian[entry.metode_pembayaran]) {
+      rincian[entry.metode_pembayaran].push(baris);
+    }
+  }
+  return rincian;
 }
 
 /**
- * Halaman Detail Setoran — lanjutan dari Riwayat Setoran, dibuka saat teller
- * klik ikon mata di kolom "Detail". Route (di App.jsx):
- *   <Route path="/setoran/:id" element={<DetailSetoran />} />
- *
- * Halaman ini "shared" (bukan di pages/teller/) karena berpotensi diakses
- * lebih dari satu role — teller lihat & edit punya sendiri, Bu Wiwik
- * (verifikator) lihat & edit semua loket.
- *
- * Mode "view" (default) -> semua baca-saja, seperti sebelumnya.
- * Mode "edit" (klik tombol Edit) -> Rincian Lampiran diganti jadi form
- * RincianSetoran (form yang sama dengan Input Setoran) + Keterangan Teller
- * jadi textarea, muncul tombol Batal & Simpan Perubahan.
- *
- * CATATAN: role Super Admin (IT) belum diputuskan apakah ikut boleh edit
- * atau cuma lihat — untuk sekarang tombol Edit HANYA muncul untuk role
- * "teller" dan "verifikator", sesuai yang sudah dikonfirmasi. Sesuaikan array
- * `ROLE_BOLEH_EDIT` di bawah begitu itu diputuskan.
- *
- * `getDetailSetoran(id)` masih mock dan SELALU mengembalikan data yang sama
- * berapa pun id-nya — nanti diganti fetch ke bridge.php berdasarkan id asli.
- * Begitu juga "Simpan Perubahan" di bawah cuma balik ke mode view tanpa
- * benar-benar mengirim apa pun ke server (belum ada endpoint PUT/POST-nya).
+ * Validasi dasar sebelum PUT. Beda dari draft Card A: di sini TIDAK ADA
+ * mode "boleh kosong" — kontrak §2 menegaskan entries wajib minimal 1, dan
+ * aturan foto_bukti per skenario (lihat tabel kontrak) lebih ketat karena
+ * tidak ada anggapan "baris belum disentuh" seperti di Input Setoran.
+ * Mengembalikan array pesan error (kosong = valid).
  */
-const ROLE_BOLEH_EDIT = ["teller", "keuangan"];
+function validasiRincianEdit(rincian) {
+  const errors = [];
+  const semuaBaris = [
+    ...rincian.transfer.map((r) => ({ ...r, metode_pembayaran: "transfer" })),
+    ...rincian.qris.map((r) => ({ ...r, metode_pembayaran: "qris" })),
+    ...rincian.tunai.map((r) => ({ ...r, metode_pembayaran: "tunai" })),
+    ...rincian.kpay.map((r) => ({ ...r, metode_pembayaran: "kpay" })),
+  ];
+
+  if (semuaBaris.length === 0) {
+    errors.push("Minimal harus ada satu transaksi tercatat.");
+    return errors;
+  }
+
+  semuaBaris.forEach((r, i) => {
+    const label = r.metode_pembayaran;
+    if (!r.nominal || Number(r.nominal) <= 0) {
+      errors.push(`${label} baris ke-${i + 1}: nominal wajib diisi.`);
+    }
+    if (r.metode_pembayaran === "kpay") {
+      if (!r.nama) errors.push(`KPay baris ke-${i + 1}: nama karyawan wajib diisi.`);
+      if (!r.nik) errors.push(`KPay baris ke-${i + 1}: NIK/identitas karyawan wajib diisi.`);
+    } else if (!r.bukti) {
+      // §2: entry baru (id kosong) non-kpay wajib foto. Entry lama yang
+      // sudah punya bukti.bukti berupa URL string lama tetap lolos (foto
+      // lama dipertahankan) — cuma ditolak kalau benar-benar tidak ada
+      // apa pun (bukan File baru maupun URL lama).
+      errors.push(`${label} baris ke-${i + 1}: bukti wajib diunggah.`);
+    }
+  });
+
+  return errors;
+}
+
+/**
+ * Kontrak §2: errors bisa 409 (optimistic lock), 429 (debounce), atau 422
+ * (per-field/business-rule) — diseragamkan jadi array pesan siap tampil.
+ */
+function uraikanErrorApi(err) {
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+
+  if (status === 409) {
+    return [data?.message || "Data ini sudah diubah pihak lain. Muat ulang halaman dulu."];
+  }
+  if (status === 429) {
+    return [data?.message || "Tunggu sebentar sebelum menyimpan lagi."];
+  }
+  if (!data) {
+    return ["Terjadi kesalahan. Periksa koneksi Anda dan coba lagi."];
+  }
+  const errorsObj = data.errors;
+  if (errorsObj && Object.keys(errorsObj).length > 0) {
+    return Object.values(errorsObj).flat();
+  }
+  return [data.message || "Gagal menyimpan. Periksa kembali."];
+}
 
 export default function DetailSetoran() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
   const { data: detail, loading, error, refresh } = useDetailSetoran(id);
 
   const [mode, setMode] = useState("view");
   const [catatanEdit, setCatatanEdit] = useState("");
+  const [rincianEdit, setRincianEdit] = useState(null);
+  const [loadingSimpan, setLoadingSimpan] = useState(false);
+  const [errorSimpan, setErrorSimpan] = useState([]);
+  const [toastMessage, setToastMessage] = useState(null);
 
-  const bolehEdit = ROLE_BOLEH_EDIT.includes(user.role);
-  
   useEffect(() => {
-    if (detail) setCatatanEdit(detail.keteranganTeller.catatan);
+    if (detail) {
+      setCatatanEdit("");
+      setRincianEdit(null); // reset supaya initialRincian dari data terbaru dipakai lagi
+    }
   }, [detail]);
 
   if (loading && !detail) {
@@ -114,18 +149,54 @@ export default function DetailSetoran() {
 
   if (!detail) return null;
 
-  const totalPendapatan = detail.pendapatan.reduce((sum, r) => sum + r.nominal, 0);
-  const initialRincian = lampiranKeRincianAwal(detail.lampiran);
+  // §1: is_editable dihitung BE (kepemilikan row + bisa_edit_setoran_semua_loket).
+  // FE DILARANG menghitung ulang logic ini sendiri — pakai apa adanya dari respons.
+  const bolehEdit = detail.is_editable === true;
+
+  const initialRincian = entriesKeRincianEdit(detail.entries);
 
   const handleBatal = () => {
-    setCatatanEdit(detail.keteranganTeller.catatan);
+    setCatatanEdit("");
+    setRincianEdit(null);
+    setErrorSimpan([]);
     setMode("view");
   };
 
-  const handleSimpan = () => {
-    // TODO: kirim perubahan ke backend (PUT /bridge.php?action=edit_setoran&id=...)
-    // begitu endpoint-nya tersedia. Untuk sekarang cuma balik ke mode lihat.
-    setMode("view");
+  const handleSimpan = async () => {
+    const rincianUntukSimpan = rincianEdit ?? initialRincian;
+    const validasiErrors = validasiRincianEdit(rincianUntukSimpan);
+    if (validasiErrors.length > 0) {
+      setErrorSimpan(validasiErrors);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setErrorSimpan([]);
+    setLoadingSimpan(true);
+    try {
+      // buildSetoranFormData sudah tau membedakan entryId (id server)
+      // vs id (key lokal React) — aman dipakai langsung di sini
+      const formData = buildSetoranFormData(rincianUntukSimpan);
+
+      // entries_updated_at WAJIB selalu dikirim — echo balik dari GET
+      // terakhir, walau nilainya null (kontrak §2: "present tapi boleh
+      // null"). String kosong dipakai di sini sebagai representasi null
+      // lewat multipart — PERLU DIKONFIRMASI ke BE apakah ini diterima
+      // sama seperti null asli, atau ada representasi lain yang diharapkan.
+      formData.append("entries_updated_at", detail.entries_updated_at ?? "");
+
+      const res = await updateSetoran(id, formData);
+      if (res?.status === "ok") {
+        setMode("view");
+        setToastMessage("Perubahan berhasil disimpan.");
+        refresh(); // ambil ulang data terbaru (termasuk entries_updated_at yang baru ter-bump)
+      }
+    } catch (err) {
+      setErrorSimpan(uraikanErrorApi(err));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setLoadingSimpan(false);
+    }
   };
 
   return (
@@ -147,40 +218,69 @@ export default function DetailSetoran() {
           <div className="flex gap-3 shrink-0">
             <button
               onClick={handleBatal}
-              className="border border-[#d9d9d6] bg-white px-5 py-2.5 rounded text-sm text-[#424751] font-medium hover:bg-[#f7f7f6] transition-colors"
+              disabled={loadingSimpan}
+              className="border border-[#d9d9d6] bg-white px-5 py-2.5 rounded text-sm text-[#424751] font-medium hover:bg-[#f7f7f6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Batal
             </button>
             <button
               onClick={handleSimpan}
-              className="bg-[#710014] flex gap-2 items-center px-5 py-2.5 rounded text-white text-sm font-medium hover:bg-[#5a000f] transition-colors"
+              disabled={loadingSimpan}
+              className="bg-[#710014] flex gap-2 items-center px-5 py-2.5 rounded text-white text-sm font-medium hover:bg-[#5a000f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <IconSend />
+              {loadingSimpan ? <IconSpinner className="size-4" /> : <IconSend />}
               <span>Simpan Perubahan</span>
             </button>
           </div>
         )}
       </div>
 
-      <DetailSetoranHeader tanggal={detail.tanggal} loket={detail.loket} petugas={detail.petugas} />
+      {errorSimpan.length > 0 && (
+        <div className="bg-[#ffdad6] border border-[#ba1a1a]/40 rounded-lg px-5 py-4">
+          <p className="text-[#93000a] text-sm font-semibold mb-1.5">
+            Periksa kembali data sebelum menyimpan:
+          </p>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {errorSimpan.map((msg, i) => (
+              <li key={i} className="text-[#93000a] text-sm">{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <DetailSetoranHeader
+        tanggal={detail.tanggal_transaksi}
+        loket={detail.nama_loket}
+        petugas={detail.nama_teller}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 w-full items-start">
         <div className="flex flex-col gap-5">
           {/* Total Pendapatan TETAP read-only apa pun mode-nya — data otomatis dari sistem SOPP */}
           <PendapatanTable rows={detail.pendapatan} />
-          <RingkasanSetoranCard ringkasanSetoran={detail.ringkasanSetoran} totalPendapatan={totalPendapatan} />
+          <RingkasanSetoranCard
+            ringkasanSetoran={{
+              transfer: detail.ringkasan_setoran.nominal_transfer,
+              qris: detail.ringkasan_setoran.nominal_qris,
+              tunai: detail.ringkasan_setoran.nominal_tunai,
+              kpay: detail.ringkasan_setoran.nominal_kpay,
+            }}
+            totalPendapatan={detail.total_pendapatan}
+            selisih={detail.selisih}
+            statusKeuangan={detail.status_keuangan}
+          />
         </div>
 
         <div className="flex flex-col gap-5">
           {mode === "edit" ? (
-            <RincianSetoran initialData={initialRincian} />
+            <RincianSetoran initialData={initialRincian} onRowsChange={setRincianEdit} />
           ) : (
-            <RincianLampiran lampiran={detail.lampiran} />
+            <RincianLampiran entries={detail.entries} />
           )}
 
           <KeteranganTellerCard
-            waktu={detail.keteranganTeller.waktu}
-            catatan={mode === "edit" ? catatanEdit : detail.keteranganTeller.catatan}
+            waktu={detail.submitted_at}
+            catatan={mode === "edit" ? catatanEdit : null}
             editable={mode === "edit"}
             onCatatanChange={setCatatanEdit}
           />
@@ -198,6 +298,8 @@ export default function DetailSetoran() {
           </button>
         </div>
       )}
+
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
     </>
   );
 }

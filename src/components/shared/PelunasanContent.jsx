@@ -5,11 +5,20 @@ import DetailPelunasan from "@/components/shared/DetailPelunasan";
 import RingkasanPelunasan from "@/components/shared/RingkasanPelunasan";
 import Toast from "@/components/ui/Toast";
 import { IconSend, IconSpinner, IconCheck } from "@/components/ui/Icon";
-import { selisihRecords } from "@/mocks/setoran";
 import { useAuthStore } from "@/store/authStore";
 import { formatRupiah } from "@/utils/formatRupiah";
+import { getPelunasan, submitPelunasan } from "@/api/teller";
 
-export default function PelunasanContent({ onBatal }) {
+/**
+ * `loketId` BARU (opsional) — dipakai halaman verifikator/InputSetoran.jsx
+ * saat mengisi Pelunasan ATAS NAMA loket lain (dropdown "Pilih Cabang").
+ * Diteruskan sebagai query/body param `loket_id` ke getPelunasan()/
+ * submitPelunasan(), mengikuti aturan resolveLoketId() yang sama dengan
+ * Card A (kontrak §0.2) — kalau tidak di-pass sama sekali (pemakaian
+ * teller biasa, tidak berubah), BE otomatis pakai loket_id milik user
+ * yang login sendiri seperti sebelumnya.
+ */
+export default function PelunasanContent({ onBatal, loketId }) {
   const user = useAuthStore((s) => s.user);
 
   const [tanggal, setTanggal] = useState("");
@@ -18,11 +27,42 @@ export default function PelunasanContent({ onBatal }) {
 
   const [tanggalTersedia, setTanggalTersedia] = useState([]);
   const [loadingTanggal, setLoadingTanggal] = useState(false);
+  
+  useEffect(() => {
+  async function muatDaftarTanggal() {
+    setLoadingTanggal(true);
+    try {
+      const res = await getPelunasan(loketId ? { loket_id: loketId } : {});
+      if (res?.status === "ok") {
+        setTanggalTersedia(
+          res.data.tanggal_tersedia.map((item) => item.tanggal)
+        );
+      }
+    } catch {
+      setTanggalTersedia([]);
+    } finally {
+      setLoadingTanggal(false);
+    }
+  }
+  muatDaftarTanggal();
+  // loketId sengaja masuk dependency: kalau verifikator ganti loket lewat
+  // dropdown, daftar tanggal tersedia harus dimuat ulang untuk loket baru
+  // itu — daftar loket lama sudah tidak relevan sama sekali.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [loketId]);
 
   const [jumlah, setJumlah] = useState("");
   const [metode, setMetode] = useState("Transfer Bank");
   const [keterangan, setKeterangan] = useState("");
   const [buktiFile, setBuktiFile] = useState(null);
+
+  // Dipakai di validasi() dan handleSimpanPelunasan(), DAN di render
+  // (RingkasanPelunasan) — makanya harus di level ini, bukan dideklarasikan
+  // ulang secara lokal di dalam masing-masing fungsi seperti sebelumnya.
+  // (Perbaikan bug: `jumlahNum` sebelumnya dipakai di JSX RingkasanPelunasan
+  // tanpa pernah dideklarasikan di scope itu — ReferenceError begitu
+  // isLoaded true, membuat mode Pelunasan crash total.)
+  const jumlahNum = parseInt(jumlah) || 0;
 
   // [SUBMIT] State untuk proses submit dan hasil akhir
   const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -31,31 +71,43 @@ export default function PelunasanContent({ onBatal }) {
   const [hasilPelunasan, setHasilPelunasan] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Fetch daftar tanggal tersedia dari BE
-  // TODO: ganti dengan axios call: GET /api/verifikator/tanggal-tersedia?loket_id=${user.loket}
-  useEffect(() => {
-    setLoadingTanggal(true);
-    setTimeout(() => {
-      setTanggalTersedia(Object.keys(selisihRecords));
-      setLoadingTanggal(false);
-    }, 500);
-  }, [user?.loket]);
+  const [loadingMuat, setLoadingMuat] = useState(false);
 
-  const handleMuatData = () => {
-    const selisih = selisihRecords[tanggal] ?? 0;
-    setSisaSelisih(selisih);
-    setJumlah(String(selisih));
-    setIsLoaded(true);
-    // Reset state submit kalau user ganti tanggal dan muat data lagi
-    setSudahSubmit(false);
-    setHasilPelunasan(null);
+  const handleMuatData = async () => {
+    setLoadingMuat(true);
+    setIsLoaded(false);
     setErrorSubmit([]);
+    try {
+      // dengan param tanggal → mode force-refresh; loket_id ikut disertakan
+      // kalau verifikator sedang mengisi atas nama loket lain
+      const res = await getPelunasan(loketId ? { tanggal, loket_id: loketId } : { tanggal });
+      if (res?.status === "ok") {
+        setSisaSelisih(res.data.sisa_selisih);
+        setJumlah(String(res.data.sisa_selisih));
+        setIsLoaded(true);
+        setSudahSubmit(false);
+        setHasilPelunasan(null);
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      if (status === 429) {
+        setErrorSubmit(["Tunggu beberapa detik sebelum refresh lagi."]);
+      } else if (status === 422) {
+        setErrorSubmit([data?.message || "Tanggal ini tidak memenuhi syarat pelunasan."]);
+      } else if (status === 502) {
+        setErrorSubmit(["Gagal mengambil data terbaru dari bridge, coba lagi."]);
+      } else {
+        setErrorSubmit(["Gagal memuat data. Periksa koneksi dan coba lagi."]);
+      }
+    } finally {
+      setLoadingMuat(false);
+    }
   };
 
   // [1] VALIDASI sebelum kirim ke BE
   const validasi = () => {
     const errs = [];
-    const jumlahNum = parseInt(jumlah) || 0;
 
     if (!jumlah || jumlahNum <= 0) {
       errs.push("Jumlah pelunasan wajib diisi dan harus lebih dari Rp 0.");
@@ -73,23 +125,38 @@ export default function PelunasanContent({ onBatal }) {
 
   // [2] HANDLER SUBMIT — validasi → kirim BE → tampilkan read-only
   const handleSimpanPelunasan = async () => {
-    const errs = validasi();
-    if (errs.length > 0) {
-      setErrorSubmit(errs);
-      return;
+  const errs = validasi();
+  if (errs.length > 0) {
+    setErrorSubmit(errs);
+    return;
+  }
+
+  setErrorSubmit([]);
+  setLoadingSubmit(true);
+
+  try {
+    // Bangun FormData sesuai kontrak POST:
+    // metode_pembayaran adalah array, tiap baris adalah object terpisah
+    const formData = new FormData();
+    formData.append("tanggal", tanggal);
+
+    // Satu baris metode — index [0] karena form ini single-metode
+    const metodeApi = metode === "Transfer Bank" ? "transfer"
+      : metode === "Tunai" ? "tunai"
+      : "qris"; // QRIS
+
+    formData.append("metode_pembayaran[0][metode]", metodeApi);
+    formData.append("metode_pembayaran[0][nominal]", String(jumlahNum));
+    if (keterangan) {
+      formData.append("metode_pembayaran[0][keterangan]", keterangan);
+    }
+    if (buktiFile) {
+      formData.append("metode_pembayaran[0][bukti]", buktiFile);
     }
 
-    setErrorSubmit([]);
-    setLoadingSubmit(true);
+    const res = await submitPelunasan(formData, loketId ? { loket_id: loketId } : {});
 
-    try {
-      // TODO: ganti mock ini dengan axios call nyata ke BE:
-      //   POST /api/pelunasan
-      //   body: { loket_id, tanggal, jumlah, metode, keterangan, bukti }
-      await new Promise((r) => setTimeout(r, 800)); // simulasi network
-
-      // Simpan data hasil untuk ditampilkan di mode read-only
-      const jumlahNum = parseInt(jumlah) || 0;
+    if (res?.status === "ok") {
       setHasilPelunasan({
         tanggal,
         jumlah: jumlahNum,
@@ -97,19 +164,35 @@ export default function PelunasanContent({ onBatal }) {
         keterangan,
         buktiFile,
         sisaSelisihAwal: sisaSelisih,
-        sisaSetelah: Math.max(0, sisaSelisih - jumlahNum),
+        // gunakan angka resmi dari BE, bukan hitung sendiri di FE
+        sisaSetelah: res.data.selisih,
+        statusKeuangan: res.data.status_keuangan,
       });
-
       setSudahSubmit(true);
       setToastMessage("Pelunasan berhasil disimpan.");
-    } catch (err) {
-      setErrorSubmit([err?.message || "Gagal menyimpan pelunasan. Coba lagi."]);
-    } finally {
-      setLoadingSubmit(false);
     }
-  };
+  } catch (err) {
+    const status = err?.response?.status;
+    const data = err?.response?.data;
 
-  const jumlahNum = parseInt(jumlah) || 0;
+    if (status === 422) {
+      const errorCode = data?.error_code;
+      if (errorCode === "selisih_belum_dimuat") {
+        setErrorSubmit(["Data selisih belum dimuat. Klik 'Muat Data' terlebih dahulu."]);
+      } else if (errorCode === "nominal_melebihi_selisih") {
+        setErrorSubmit(["Jumlah pelunasan melebihi sisa selisih yang tersedia."]);
+      } else if (data?.errors && Object.keys(data.errors).length > 0) {
+        setErrorSubmit(Object.values(data.errors).flat());
+      } else {
+        setErrorSubmit([data?.message || "Terjadi kesalahan. Coba lagi."]);
+      }
+    } else {
+      setErrorSubmit([data?.message || "Gagal menyimpan pelunasan. Coba lagi."]);
+    }
+  } finally {
+    setLoadingSubmit(false);
+  }
+};
 
   // [3] TAMPILAN READ-ONLY setelah submit berhasil
   if (sudahSubmit && hasilPelunasan) {

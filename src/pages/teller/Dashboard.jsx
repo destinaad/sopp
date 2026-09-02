@@ -36,14 +36,26 @@ export default function Dashboard() {
   const summary = data
     ? {
         pendapatanHariIni: data.pendapatan_sopp,
-        pendapatanStatus: data.pendapatan_sopp_status, // null | "gagal_dimuat"
+        pendapatanStatus: data.pendapatan_sopp_status,
+        dataTerkini: data.data_terkini,
         persenVsKemarin: data.persentase_vs_kemarin, // bisa null
+        pendapatanKemarinStatus: data.pendapatan_kemarin_status,
         statusSetoran: data.status_setoran, // "draft" | "submitted" | "belum_input"
         selisih: data.selisih,
+        adaSelisih: data.ada_selisih,
       }
     : null;
 
-  const riwayatTerakhir = data?.riwayat_terakhir ?? [];
+  const riwayatTerakhir = (data?.aktivitas_terakhir ?? []).map((item) => ({
+    tanggal: item.tanggal_transaksi,
+    totalPendapatan: item.total_pendapatan,
+    totalSetor: item.total_setor,
+    selisih: item.selisih,
+    status: item.status_workflow,
+    namaTeller: item.nama_teller,
+    statusKeuangan: item.status_keuangan,
+  }));
+  
   const totalPages = Math.max(1, Math.ceil(riwayatTerakhir.length / PAGE_SIZE));
   const rowsHalaman = riwayatTerakhir.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

@@ -6,9 +6,15 @@ import { formatDateWithDay } from "@/utils/formatDate";
  * "Pelunasan Setoran Lama". Cuma untuk MEMILIH mode, tidak ada input tanggal
  * di sini lagi — untuk mode "pelunasan", pemilihan tanggal + "Muat Data"
  * sekarang ditangani PelunasanDatePicker.jsx di dalam PelunasanContent.jsx.
+ *
+ * `tanggal` (BARU, opsional) — tanggal ISO ("YYYY-MM-DD") yang lagi dipilih
+ * teller lewat TanggalTransaksiPicker di InfoTransaksi. Kalau di-pass, badge
+ * tanggal di Card A ikut tanggal itu (bukan hardcode hari ini lagi). Kalau
+ * tidak di-pass (mis. dipakai di tempat lain tanpa konsep tanggal terpilih),
+ * fallback ke hari ini supaya tetap kompatibel.
  */
-export default function OptionCards({ mode, onModeChange }) {
-  const hariIni = formatDateWithDay(new Date());
+export default function OptionCards({ mode, onModeChange, tanggal }) {
+  const tanggalDitampilkan = formatDateWithDay(tanggal ? new Date(`${tanggal}T00:00:00`) : new Date());
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
@@ -35,7 +41,7 @@ export default function OptionCards({ mode, onModeChange }) {
             <span className="text-[#424751] text-sm pb-3">Catat setoran untuk transaksi hari ini</span>
             <div className="bg-[rgba(113,0,20,0.1)] flex gap-1 items-center px-2 py-1 rounded-xl w-fit">
               <IconClockSmall />
-              <span className="font-semibold text-[#191c20] text-xs tracking-[0.6px]">{hariIni}</span>
+              <span className="font-semibold text-[#191c20] text-xs tracking-[0.6px]">{tanggalDitampilkan}</span>
             </div>
           </div>
         </div>

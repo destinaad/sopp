@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
 import PageLayout from "@/components/layout/PageLayout";
 import { useAuthStore } from "@/store/authStore";
+import { getMe } from "@/api/auth";
+import { mapUserDariApi } from "@/utils/mapUser";
 
 // Auth
 import Login from "./pages/auth/Login";
@@ -88,6 +90,47 @@ function RoleGuard({ allowedRoles }) {
 }
 
 export default function App() {
+  const setUser = useAuthStore((s) => s.setUser);
+
+  // Penanda "sudah selesai cek sesi ke server apa belum". Selama masih
+  // false, kita TIDAK BOLEH render <Routes> dulu — supaya RoleGuard tidak
+  // sempat melempar user ke /login duluan padahal sesinya (cookie) masih
+  // valid, cuma authStore di memori yang kosong karena baru refresh.
+  const [cekSesiSelesai, setCekSesiSelesai] = useState(false);
+
+  // Jalan SEKALI setiap kali aplikasi pertama kali dibuka/direfresh —
+  // menanyakan ke BE "cookie sesi yang nempel di browser ini punya siapa?"
+  // lewat GET /api/v1/me. Ini yang membuat sesi login tetap "nyantol"
+  // walau halaman di-refresh atau tab baru dibuka.
+  useEffect(() => {
+    async function cekSesi() {
+      try {
+        const res = await getMe();
+        if (res?.status === "ok") {
+          setUser(mapUserDariApi(res.data.user));
+        }
+      } catch (err) {
+        // Wajar terjadi kalau memang belum login / cookie sudah kadaluarsa.
+        // Tidak perlu ditangani di sini — biarkan authStore tetap null,
+        // nanti RoleGuard yang otomatis mengarahkan ke /login.
+      } finally {
+        setCekSesiSelesai(true);
+      }
+    }
+
+    cekSesi();
+  }, [setUser]);
+
+  // Selama proses cek sesi masih berjalan, tampilkan layar tunggu supaya
+  // routing di bawah tidak sempat jalan dengan data user yang belum pasti.
+  if (!cekSesiSelesai) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f6]">
+        <span className="text-[#727782] text-sm">Memuat...</span>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       {/* SessionGuard dipasang di sini supaya aktif di seluruh aplikasi */}

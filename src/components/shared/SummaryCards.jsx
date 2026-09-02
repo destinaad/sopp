@@ -3,29 +3,13 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import { IconTrendUp } from "@/components/ui/Icon";
 import { formatRupiah } from "@/utils/formatRupiah";
 
-/**
- * 3 kartu ringkasan di paling atas dashboard teller:
- * pendapatan hari ini, status setoran, dan selisih.
- * Nilai-nilainya datang dari `summary` — di-map dari response getDashboard()
- * (lihat pages/teller/Dashboard.jsx) supaya nama field di sini tetap netral
- * (camelCase), tidak terikat ke bentuk snake_case API.
- *
- * persenVsKemarin BISA null (mis. pendapatan kemarin = 0, jadi persentase
- * kenaikan/penurunan tidak bisa dihitung) — sesuai kontrak API §7.1, kalau
- * null WAJIB tampil "---", bukan "null%" atau "0%".
- *
- * pendapatanStatus BISA "gagal_dimuat" — artinya bridge.php gagal diakses
- * BE saat menyusun response ini. Field pendapatan_sopp tetap ada (biasanya
- * 0 atau data basi), tapi TIDAK BOLEH ditampilkan sebagai angka yang
- * meyakinkan — kontrak minta pola konsisten: tunjukkan "Gagal dimuat",
- * bukan Rp 0 yang bisa disalahartikan sebagai "pendapatan hari ini
- * memang nol".
- */
 export default function SummaryCards({ summary }) {
   if (!summary) return null;
-  const { pendapatanHariIni, pendapatanStatus, persenVsKemarin, statusSetoran, selisih } = summary;
-  const selisihColor = selisih === 0 ? "#006c49" : "#ba1a1a";
+  const { pendapatanHariIni, pendapatanStatus, persenVsKemarin, pendapatanKemarinStatus, statusSetoran, selisih } = summary;
+  const selisihTidakDiketahui = selisih === null;
+  const selisihColor = selisihTidakDiketahui ? "#727782" : selisih === 0 ? "#006c49" : "#ba1a1a";
   const bridgeGagal = pendapatanStatus === "gagal_dimuat";
+  const dataBelumTerbaru = summary.dataTerknisi === false;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
@@ -42,10 +26,20 @@ export default function SummaryCards({ summary }) {
           ) : (
             <>
               <span className="font-semibold text-[#710014] text-2xl tracking-tight">{formatRupiah(pendapatanHariIni)}</span>
+              {dataBelumTerbaru && (
+                <span className="text-[#9a6700] text-xs tracking-[0.6px]">
+                  Data mungkin belum terbaru
+                </span>
+              )}
+
               <div className="flex gap-1 items-center pt-1">
                 <IconTrendUp />
                 <span className="font-semibold text-[#006c49] text-xs tracking-[0.6px] whitespace-nowrap">
-                  {persenVsKemarin === null ? "---" : `${persenVsKemarin}%`} vs Kemarin
+                  {pendapatanKemarinStatus === "gagal_dimuat"
+                  ? "Data tidak bisa dimuat"
+                  : persenVsKemarin === null
+                  ? "Kemarin tidak ada pendapatan"
+                  : `${persenVsKemarin}% vs Kemarin`}
                 </span>
               </div>
             </>
@@ -64,10 +58,10 @@ export default function SummaryCards({ summary }) {
         <div className="flex flex-col gap-1 p-6">
           <span className="font-semibold text-[#424751] text-xs tracking-[0.6px] uppercase">SELISIH</span>
           <span className="font-semibold text-2xl tracking-tight" style={{ color: selisihColor }}>
-            {formatRupiah(selisih)}
+            {selisihTidakDiketahui ? "Tidak diketahui" : formatRupiah(selisih)}
           </span>
           <span className="font-semibold italic text-xs tracking-[0.6px]" style={{ color: selisihColor }}>
-            {selisih === 0 ? "Data Seimbang" : "Ada Selisih"}
+            {selisihTidakDiketahui ? "Data pendapatan gagal dimuat" : selisih === 0 ? "Data Seimbang" : "Ada Selisih"}
           </span>
         </div>
       </Card>

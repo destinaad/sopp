@@ -16,7 +16,6 @@ export default function Navbar({ onMenuToggle }) {
       await logoutApi(); // 1. beritahu BE → matiin sesi di server
     } catch {
       // Tetap lanjut logout di FE walau BE error
-      // (misal: sesi sudah expired duluan di server)
     } finally {
       clearUser();                            // 2. bersihkan data user di store
       navigate("/login", { replace: true }); // 3. arahkan ke halaman login

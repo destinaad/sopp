@@ -43,7 +43,8 @@ export default function Sidebar({ open, onClose }) {
   const user = useAuthStore((s) => s.user);
   const navItems = navItemsPerRole[user?.role] ?? navItemsPerRole.teller;
 
-  const linkBase = "flex gap-4 items-center px-4 py-2 rounded w-full text-sm font-medium transition-colors";
+  const linkBase =
+    "flex gap-3 items-center px-4 py-2.5 rounded-lg w-full text-sm font-medium transition-colors";
 
   return (
     <>
@@ -52,19 +53,28 @@ export default function Sidebar({ open, onClose }) {
 
       <aside
         className={`
-          fixed md:static top-16 left-0 h-[calc(100vh-64px)] w-60 bg-white border-r border-[#c2c6d2]
-          flex flex-col z-20 transition-transform duration-200
+          fixed md:static top-0 left-0 h-screen md:h-[calc(100vh-64px)] w-64 bg-primary
+          flex flex-col z-30 transition-transform duration-200 shrink-0
           ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
-        <nav className="flex flex-col gap-1 p-2 flex-1">
+        {/* Brand, hanya perlu tampil di mobile karena di desktop Navbar sudah menutupi tinggi ini */}
+        <div className="flex items-center h-16 px-6 shrink-0 md:hidden">
+          <span className="font-semibold text-white text-2xl tracking-tight">SOPP Setoran</span>
+        </div>
+
+        <nav className="flex flex-col gap-2 px-3 pt-4 flex-1 overflow-y-auto">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               onClick={onClose}
               className={({ isActive }) =>
-                `${linkBase} ${isActive ? "bg-[#710014] text-[#f7f5f5]" : "text-[#424751] hover:bg-[#f7f7f6]"}`
+                `${linkBase} ${
+                  isActive
+                    ? "bg-white text-primary shadow-sm"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }`
               }
             >
               <Icon />
@@ -73,10 +83,10 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        <div className="border-t border-[#c2c6d2] p-4">
-          <div className="bg-[#ededf4] rounded p-4 flex flex-col gap-1">
-            <span className="font-semibold text-[#424751] text-xs tracking-[0.6px]">Internal Settlement System</span>
-            <span className="font-semibold text-[#727782] text-xs tracking-[0.6px]">v2.4.0-stable</span>
+        <div className="p-4 shrink-0">
+          <div className="bg-white/10 rounded-lg p-4 flex flex-col gap-1">
+            <span className="font-semibold text-white text-xs tracking-[0.6px]">Internal Settlement System</span>
+            <span className="font-medium text-white/60 text-xs tracking-[0.6px]">v2.4.0-stable</span>
           </div>
         </div>
       </aside>

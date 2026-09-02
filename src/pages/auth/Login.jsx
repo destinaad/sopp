@@ -2,24 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { IconLock, IconEye, IconEyeOff, IconSpinner, IconShieldCheck } from "@/components/ui/Icon";
+import { login as loginApi } from "@/api/auth";
+import { getCsrfCookie } from "@/lib/axios";
+import { mapUserDariApi, DASHBOARD_PER_ROLE } from "@/utils/mapUser";
 
-/**
- * Halaman Login — INI PINTU MASUK KHUSUS SUPER ADMIN.
- * Route (di App.jsx): <Route path="/login" element={<Login />} />
- *
- * Teller & Bu Wiwik TIDAK PERNAH lewat halaman ini — mereka masuk lewat
- * SSO handoff dari website lama (baca token dari URL, verifikasi ke
- * backend, langsung dapat sesi). Halaman ini murni buat Super Admin yang
- * login manual pakai username+password, seperti form login pada umumnya.
- *
- * Validasi sekarang murni simulasi client-side (belum ada endpoint
- * /bridge.php?action=login dari backend):
- * - Username & password wajib diisi
- * - Kalau diisi asal (bukan kosong), dianggap SUKSES — nanti begitu
- *   backend siap, ganti bagian simulasi di handleSubmit dengan fetch
- *   sungguhan ke endpoint login, dan biarkan backend yang validasi
- *   username/password benar atau salah.
- */
 export default function Login() {
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
@@ -30,7 +16,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -40,15 +26,23 @@ export default function Login() {
     }
 
     setLoading(true);
+    try {
+      await getCsrfCookie();
+      const res = await loginApi(username, password);
+      if (res?.status !== "ok") {
+        setError(res?.message || "Username atau password salah.");
+        return;
+      }
 
-    // TODO: ganti simulasi ini dengan POST /bridge.php?action=login
-    // begitu endpoint-nya tersedia. Backend yang menentukan valid/tidaknya
-    // kredensial, lalu kembalikan {name, role, loket} sesungguhnya.
-    setTimeout(() => {
+      const user = mapUserDariApi(res.data.user);
+      setUser(user);
+      navigate(DASHBOARD_PER_ROLE[user.role] || "/admin/dashboard", { replace: true});
+    }  catch (err) {
+      const pesanBe = err?.response?.data?.message;
+      setError(pesanBe || "Gagal masuk. Periksa username/password atau koneksi Anda.");
+    } finally {
       setLoading(false);
-      setUser({ name: username, role: "admin", loket: null });
-      navigate("/admin/dashboard", { replace: true });
-    }, 700);
+    }
   };
 
   return (

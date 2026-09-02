@@ -28,7 +28,7 @@ export default function KpayRow({ row, onNamaChange, onNikChange, onKeteranganCh
       />
       <input
         type="text"
-        placeholder="NIK"
+        placeholder="Identitas Karyawan"
         value={row.nik}
         onChange={(e) => onNikChange(e.target.value)}
         className="flex-1 min-w-[80px] bg-[#efefed] border border-[#d9d9d6] rounded-sm px-4 py-2.5 text-sm text-[#191c20] placeholder-[#6b7280] focus:outline-none focus:ring-2 focus:ring-[#710014]/30"

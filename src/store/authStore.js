@@ -7,9 +7,9 @@ import { create } from "zustand";
 export const useAuthStore = create((set) => ({
   user: {
     name: "Budi Santoso",
-    role: "admin", // ganti ke "verifikator" atau "admin" untuk test role lain
+    role: "teller",
     loket: "SOPP Blimbing",
   },
-  setUser: (user) => set({ user }),
-  logout: () => set({ user: null }),
+  setUser: (user)=> set({ user }),
+  logout: () => set({ user:null }),
 }));

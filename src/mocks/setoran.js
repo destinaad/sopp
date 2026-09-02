@@ -60,6 +60,36 @@ export const totalDataRiwayat = 142;
 export const totalHalamanRiwayat = 24;
 
 /**
+ * [INPUT SETORAN] Cek status setoran untuk satu tanggal tertentu — dipakai
+ * saat teller memilih tanggal transaksi lewat kalender di halaman Input
+ * Setoran. Sumber data SEMENTARA masih dari riwayatSetoranList (mock) yang
+ * sama dengan yang dipakai halaman Riwayat Setoran, supaya konsisten:
+ * kalau sebuah tanggal statusnya "submitted" di Riwayat, maka di sini juga
+ * bakal kebaca "sudah ada setoran".
+ *
+ * Return salah satu dari:
+ * - "kosong"   -> belum ada entry setoran sama sekali untuk tanggal ini,
+ *                 form Input Setoran boleh aktif & diisi dari nol.
+ * - "terkunci" -> SUDAH ada entry setoran tercatat (workflow apa pun —
+ *                 baik "draft" maupun "submitted", karena begitu ada baris
+ *                 tercatat, tanggal itu dianggap "sudah dipakai"), form
+ *                 harus tampil ter-lock (read only) supaya teller tidak
+ *                 bikin entry dobel. Kalau memang niatnya melunasi selisih,
+ *                 arahkan lewat card "Pelunasan Setoran Lama", BUKAN form ini.
+ *
+ * Nanti diganti fetch sungguhan ke BE, misal:
+ *   GET /api/teller/setoran/status?tanggal=2026-07-24
+ * yang me-return { status: "kosong" | "terkunci", data: {...} }
+ */
+export function getStatusSetoranTanggal(tanggal) {
+  const existing = riwayatSetoranList.find((row) => row.tanggal === tanggal);
+  if (!existing) {
+    return { status: "kosong", data: null };
+  }
+  return { status: "terkunci", data: existing };
+}
+
+/**
  * [RIWAYAT] 3 kartu ringkasan di bagian bawah halaman Riwayat Setoran.
  */
 export const ringkasanRiwayat = {

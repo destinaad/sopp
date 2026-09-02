@@ -8,11 +8,42 @@
   * {
     box-sizing: border-box;
   }
+  html {
+    /* Scroll halus untuk perpindahan yang dipicu lewat script (mis. scroll-into-view,
+       anchor link). Tidak berpengaruh ke scroll roda mouse/trackpad biasa — itu
+       sudah alami dari browser & OS, jadi tidak kita utak-atik supaya tetap responsif. */
+    scroll-behavior: smooth;
+  }
   body {
     font-family: 'Inter', sans-serif;
     background-color: #F7F7F6;
     color: #3D3D3A;
     margin: 0;
     padding: 0;
+  }
+}
+
+@layer utilities {
+  /* Scrollbar tipis & lembut untuk area konten yang scroll (main, sidebar, dsb).
+     Dipakai lewat class `scrollbar-thin` di elemen yang overflow-y-auto/scroll. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #c2c6d2 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #c2c6d2;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #9C9A92;
   }
 }

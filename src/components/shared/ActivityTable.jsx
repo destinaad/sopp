@@ -56,7 +56,7 @@ export default function ActivityTable({ rows, totalEntri, page, totalPages, onPa
                       {formatRupiah(row.selisih)}
                     </td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={row.status} />
+                      <StatusBadge status={row.statusWorkflow} />
                     </td>
                   </tr>
                 );

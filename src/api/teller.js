@@ -1,67 +1,105 @@
-import { dashboardSummary, riwayatSetoranTerakhir } from "@/mocks/dashboard";
-import { dataPendapatanSOPP, getDetailSetoran as mockGetDetailSetoran, selisihRecords, riwayatSetoranList, totalDataRiwayat, totalHalamanRiwayat, ringkasanRiwayat } from "@/mocks/setoran";
-
-// Note: these functions return Promises that resolve to objects matching
-// the API contract: { status: 'ok' | 'error', data: ... }
-// When backend is ready, replace dummy body with axios calls e.g. api.get(...)
+import api from "@/lib/axios";
 
 export async function getDashboard() {
-  const payload = {
-    nama_teller: "Budi Santoso",
-    nama_loket: "SOPP Blimbing",
-    tanggal_transaksi: new Date().toISOString().slice(0, 10),
-    pendapatan_sopp: 13411069,
-    pendapatan_sopp_status: null, // null = bridge berhasil; can be 'gagal_dimuat'
-    persentase_vs_kemarin: 8.2,
-    status_setoran: "draft",
-    selisih: 0,
-    ada_selisih: false,
-    fetched_at: new Date().toISOString().replace("T", " ").slice(0, 19),
-    riwayat_terakhir: riwayatSetoranTerakhir || [],
-  };
-
-  return Promise.resolve({ status: "ok", data: payload });
+  const res = await api.get("/api/v1/teller/dashboard");
+  return res.data;
 }
 
-export async function getSetoranHariIni(options = {}) {
-  // support ?refresh=1 but it's dummy so ignore
-  const payload = {
-    pendapatan: dataPendapatanSOPP,
-    total_pendapatan: dataPendapatanSOPP.reduce((s, r) => s + r.nominal, 0),
-    fetched_at: new Date().toISOString(),
-  };
-
-  return Promise.resolve({ status: "ok", data: payload });
+export async function getFormSetoran(params = {}) {
+  const res = await api.get("/api/v1/teller/setoran", { params });
+  return res.data;
 }
 
-export async function getSisaPelunasan(tanggal) {
-  const value = selisihRecords[tanggal] ?? 0;
-  return Promise.resolve({ status: "ok", data: { tanggal, sisa_pelunasan: value } });
+/**
+ * Endpoint: GET /api/v1/teller/setoran/kalender (Card A §4).
+ * Dipakai buat date-picker: nunjukin status tiap tanggal dalam sebulan
+ * (belum_input/draft/submitted) supaya teller bisa lihat sekilas tanggal
+ * mana yang masih perlu diisi. Panggil SEKALI per bulan yang ditampilkan
+ * di date-picker (bukan per-tanggal), hasilnya sudah gap-filled untuk
+ * seluruh hari dalam bulan itu.
+ *
+ * PENTING (§4): endpoint ini scope-nya PERSONAL (status setoran user yang
+ * login sendiri), BUKAN status keseluruhan loket.
+ *
+ * params: { loket_id?: number, bulan: string } — bulan WAJIB, format Y-m (mis. "2026-08")
+ */
+export async function getKalenderSetoran(params) {
+  const res = await api.get("/api/v1/teller/setoran/kalender", { params });
+  return res.data;
+}
+
+/**
+ * Kedua fungsi di bawah ini menerima `formData` yang SUDAH dalam bentuk
+ * FormData final sesuai kontrak (array flat entries[], field
+ * metode_pembayaran/nominal/foto_bukti/dst) — lihat
+ * utils/buildSetoranFormData.js untuk proses "penerjemahan" dari bentuk
+ * {transfer, qris, tunai, kpay} yang dipakai RincianSetoran.jsx.
+ *
+ * Dikirim sebagai multipart/form-data (bukan JSON) karena entries bisa
+ * membawa file foto_bukti per baris — axios otomatis set Content-Type
+ * yang benar kalau body-nya FormData, jadi tidak perlu diset manual.
+ *
+ * Endpoint: POST /api/v1/teller/setoran/draft (Card A §2)
+ * Endpoint: POST /api/v1/teller/setoran/submit (Card A §3)
+ */
+export async function saveDraftSetoran(formData) {
+  const res = await api.post("/api/v1/teller/setoran/draft", formData);
+  return res.data;
+}
+
+export async function submitSetoran(formData) {
+  const res = await api.post("/api/v1/teller/setoran/submit", formData);
+  return res.data;
+}
+
+export async function getPelunasan(params = {}) {
+  const res = await api.get("/api/v1/teller/setoran/pelunasan", { params });
+  return res.data;
 }
 
 export async function getRiwayat(params = {}) {
-  const page = Number(params.page) || 1;
-  const per_page = 8;
-  const items = riwayatSetoranList;
-  const totalItems = totalDataRiwayat || items.length;
-  const meta = {
-    current_page: page,
-    per_page,
-    total_items: totalItems,
-    total_pages: totalHalamanRiwayat || Math.max(1, Math.ceil(totalItems / per_page)),
-  };
-
-  return Promise.resolve({ status: "ok", data: { items, meta, ringkasan: ringkasanRiwayat || {} } });
+  const res = await api.get("/api/v1/teller/setoran/riwayat", { params });
+  return res.data;
 }
 
+export async function deleteRiwayat(id, alasan = null) {
+  const res = await api.delete(`/api/v1/teller/setoran/riwayat/${id}`, {
+    data: alasan ? { alasan } : {},
+  });
+  return res.data;
+}
+
+export async function exportRiwayat(params = {}) {
+  const res = await api.get("/api/v1/teller/setoran/riwayat/export", { 
+    params, 
+    responseType: "blob",
+  });
+  return res;
+} 
+
+/**
+ * Endpoint: GET /api/v1/teller/setoran/{id} (Detail Setoran §1).
+ * Hanya pernah beroperasi di row berstatus submitted — row draft (termasuk
+ * draft milik sendiri) selalu 404 di endpoint ini.
+ */
 export async function getDetailSetoran(id) {
-  const detail = mockGetDetailSetoran(id);
-  return Promise.resolve({ status: "ok", data: detail });
+  const res = await api.get(`/api/v1/teller/setoran/${id}`);
+  return res.data;
 }
 
-// Password change
+/**
+ * Endpoint: PUT /api/v1/teller/setoran/{id} (Detail Setoran §2).
+ * Full replace entries row ini — upsert + delete-by-omission (hard delete).
+ * `formData` harus sudah termasuk `entries_updated_at` (WAJIB present, boleh
+ * kosong) — lihat buildSetoranFormData dan DetailSetoran.jsx.
+ * Dikirim sebagai multipart/form-data karena ada file upload per-entry.
+ */
+export async function updateSetoran(id, formData) {
+  const res = await api.put(`/api/v1/teller/setoran/${id}`, formData);
+  return res.data;
+}
+
 export async function gantiPassword(password) {
-  // Dummy: validate length
   if (!password || password.length < 6) {
     const error = {
       response: {
@@ -75,34 +113,21 @@ export async function gantiPassword(password) {
   return Promise.resolve({ status: "ok", data: null });
 }
 
-// Input Setoran operations (names chosen to be clear and stable)
-export async function createSetoranEntry(entry) {
-  // entry: { provider, nominal, ... } — accept any object and echo id
-  const created = { ...entry, id: `ENTRY-${Date.now()}` };
-  return Promise.resolve({ status: "ok", data: created });
+export async function submitPelunasan(formData, params = {}) {
+  const res = await api.post("/api/v1/teller/setoran/pelunasan", formData, { params });
+  return res.data;
 }
 
-export async function updateSetoranEntry(id, updates) {
-  // Dummy: echo back merged
-  const updated = { id, ...updates };
-  return Promise.resolve({ status: "ok", data: updated });
-}
+/** 
+ * Endpoint: GET /api/v1/lokets
+ * Mengambil daftar semua loket, diurutkan alfabetis nama_loket
+ * Syarat akses: cukup sudah login
+ * 
+ * Response:{ status: "ok", data: [{ loket_id, nama_loket }, ...]}
+ * data selalu array
+ */
 
-export async function deleteSetoranEntry(id) {
-  return Promise.resolve({ status: "ok", data: { id } });
-}
-
-export async function saveDraftSetoran(payload) {
-  // payload: full draft
-  return Promise.resolve({ status: "ok", data: { draft_id: `DRAFT-${Date.now()}`, ...payload } });
-}
-
-export async function submitSetoran(payload) {
-  // payload: full setoran to submit
-  return Promise.resolve({ status: "ok", data: { submitted: true, id: `SET-${Date.now()}` } });
-}
-
-export async function createPelunasan(tanggal, nominal) {
-  // Dummy: accept and echo
-  return Promise.resolve({ status: "ok", data: { tanggal, nominal, pelunasan_id: `PEL-${Date.now()}` } });
+export async function getLokets() {
+  const res = await api.get("/api/v1/lokets");
+  return res.data;
 }
