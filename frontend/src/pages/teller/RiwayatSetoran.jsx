@@ -11,9 +11,6 @@ import { useAuthStore } from "@/store/authStore";
 export default function RiwayatSetoran() {
   const navigate = useNavigate();
 
-  // Akun berkapabilitas edit lintas-loket melihat setoran SUBMITTED di loket yang
-  // dipilih (BE: GET /riwayat?loket_id=..., Gate updateForOtherLoket). Tanpa
-  // loket_id BE hanya mengembalikan setoran milik akun itu sendiri.
   const user = useAuthStore((s) => s.user);
   const bisaLintasLoket = Boolean(user?.bisa_edit_setoran_semua_loket);
   const [daftarLoket, setDaftarLoket] = useState([]);
@@ -28,11 +25,6 @@ export default function RiwayatSetoran() {
 
   const { data, loading, error, refresh, setFilters, filtersUntukExport } = useRiwayatSetoran({ page: currentPage });
 
-  // Setiap kali salah satu filter (atau halaman) berubah, kirim ulang
-  // ke hook sebagai parameter request — BUKAN lagi difilter manual di
-  // sisi FE lewat .filter(). Ini penting karena kontrak API bilang BE
-  // yang bertanggung jawab menyaring & mem-paginasi data, FE cukup
-  // kirim filter sebagai query parameter.
   useEffect(() => {
     setFilters({
       tanggal_mulai: dari || undefined,

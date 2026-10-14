@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { IconLock, IconEye, IconEyeOff, IconSpinner } from "@/components/ui/Icon";
 import { login as loginApi } from "@/api/auth";
@@ -8,6 +8,7 @@ import { mapUserDariApi, getDefaultDashboard } from "@/utils/mapUser";
 
 export default function Login() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
   const [username, setUsername] = useState("");
@@ -44,6 +45,10 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (user) {
+    return <Navigate to={getDefaultDashboard(user)} replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#f7f7f6] px-4 py-10">

@@ -13,17 +13,6 @@ import useInputSetoran from "@/hooks/useInputSetoran";
 import { buildSetoranFormData } from "@/utils/buildSetoranFormData";
 import { getLokets } from "@/api/teller";
 
-/**
- * Sengaja disalin dari teller/InputSetoran.jsx apa adanya (bukan
- * di-import), supaya halaman verifikator tidak diam-diam ikut berubah
- * kalau suatu saat aturan validasi Card A khusus teller direvisi tanpa
- * sepengetahuan tim yang pegang halaman ini. Kalau nanti ternyata
- * aturannya memang selalu identik dan mau digabung, pindahkan ke satu
- * util bersama (mis. utils/setoranForm.js) dan import di kedua halaman.
- *
- * Aturan mengikuti kontrak API Card A §0.6/§0.7 — lihat komentar lengkap
- * di teller/InputSetoran.jsx untuk penjelasan tiap baris.
- */
 function validasiRincian(rincian) {
   const errors = [];
 
@@ -409,6 +398,7 @@ export default function InputSetoranKeuangan() {
                     initialData={rincian}
                     onTotalChange={setTotalSetor}
                     onRowsChange={setRincian}
+                    readOnly={isLocked}
                   />
                   <RingkasanOtomatis totalSetor={totalSetor} totalPendapatanSOPP={totalPendapatanSOPP} selisih={selisih} />
 

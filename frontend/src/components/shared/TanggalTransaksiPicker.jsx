@@ -8,7 +8,6 @@ const NAMA_BULAN = [
 ];
 const NAMA_HARI_PENDEK = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
-/** "2026-07-24" (local, bukan UTC — supaya tidak geser 1 hari di WIB) */
 function toISODate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -20,11 +19,9 @@ function isSameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** Grid 6x7 (42 sel) mengikuti kalender bulan berjalan, termasuk padding
- * tanggal bulan sebelum/sesudahnya supaya barisnya rapi. */
 function buildCalendarGrid(year, month) {
   const firstOfMonth = new Date(year, month, 1);
-  const startOffset = firstOfMonth.getDay(); // 0=Minggu
+  const startOffset = firstOfMonth.getDay();
   const gridStart = new Date(year, month, 1 - startOffset);
 
   return Array.from({ length: 42 }, (_, i) => {
@@ -38,8 +35,8 @@ export default function TanggalTransaksiPicker({
   value,
   onChange,
   statusTanggal = null,
-  kalenderMap = {},      // { "2026-08-15": { status, bisa_diinput }, ... }
-  onViewChange,          // (bulanStr: "2026-08") => void, dipanggil saat bulan ditampilkan berubah
+  kalenderMap = {},
+  onViewChange,
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -48,19 +45,14 @@ export default function TanggalTransaksiPicker({
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
 
-  // Beri tahu parent setiap kali bulan yang ditampilkan berganti, supaya
-  // parent bisa fetch data kalender bulan itu (Card A §4: dipanggil per
-  // bulan, bukan per-tanggal).
   useEffect(() => {
     if (!onViewChange) return;
     const bulanStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
     onViewChange(bulanStr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewYear, viewMonth]);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Klik di luar popup -> tutup
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e) {
@@ -72,9 +64,6 @@ export default function TanggalTransaksiPicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  // Buka popup sekaligus reset grid ke bulan dari tanggal yang lagi aktif.
-  // Dilakukan langsung di event handler (bukan useEffect) supaya tidak ada
-  // setState di dalam body efek.
   const handleToggleOpen = () => {
     setOpen((prevOpen) => {
       const willOpen = !prevOpen;
@@ -100,7 +89,7 @@ export default function TanggalTransaksiPicker({
   };
 
   const handlePilihTanggal = (d) => {
-    if (d > today) return; // jaga-jaga, walau tombolnya sudah disabled
+    if (d > today) return;
     onChange(toISODate(d));
     setOpen(false);
   };
@@ -121,7 +110,6 @@ export default function TanggalTransaksiPicker({
 
       {open && (
         <div className="absolute z-40 top-full left-0 mt-2 bg-white border border-[#d9d9d6] rounded-lg shadow-lg p-4 w-[300px]">
-          {/* Header navigasi bulan */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
@@ -144,7 +132,6 @@ export default function TanggalTransaksiPicker({
             </button>
           </div>
 
-          {/* Nama hari */}
           <div className="grid grid-cols-7 mb-1">
             {NAMA_HARI_PENDEK.map((h) => (
               <span key={h} className="text-center text-[10px] font-semibold text-[#9C9A92] tracking-[0.4px] py-1">
@@ -153,19 +140,15 @@ export default function TanggalTransaksiPicker({
             ))}
           </div>
 
-          {/* Grid tanggal */}
           <div className="grid grid-cols-7 gap-y-1">
-                        {grid.map((d) => {
+            {grid.map((d) => {
               const inCurrentMonth = d.getMonth() === viewMonth;
               const isFuture = d > today;
               const isSelected = isSameDay(d, selectedDate);
               const isToday = isSameDay(d, today);
               const iso = toISODate(d);
               const infoTanggal = kalenderMap[iso];
-              // bisa_diinput dari server jadi sumber kebenaran tambahan —
-              // kalau server bilang false (mis. sudah submitted), tetap
-              // disable walau bukan tanggal masa depan (Card A §4).
-              const isDisabled = isFuture || infoTanggal?.bisa_diinput === false;
+              const isDisabled = isFuture;
 
               return (
                 <button

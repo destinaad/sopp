@@ -55,6 +55,11 @@ class SelisihPerUserService
         try {
             $hasil = $this->bridge->fetchDetailPerUser($tanggal, $tanggal, $row->loket_id);
         } catch (BridgeException $e) {
+            \Log::warning('Gagal fetch bridge detail per user untuk satu row', [
+                'loket_id' => $row->loket_id,
+                'rentang_tanggal' => [$tanggal, $tanggal],
+                'pesan' => $e->getMessage(),
+            ]);
             // Konsisten sama filosofi gagal_dimuat yang sudah ada di
             // seluruh sistem ini -- gagal fetch bukan alasan buat
             // nge-500 seluruh halaman Detail Setoran/Riwayat, cukup
@@ -95,6 +100,11 @@ class SelisihPerUserService
             try {
                 $dataBridge = $this->bridge->fetchDetailPerUser($tanggalMulai, $tanggalSelesai, (int) $loketId)['data'];
             } catch (BridgeException $e) {
+                \Log::warning('Gagal fetch bridge detail per user untuk banyak row', [
+                    'loket_id' => (int) $loketId,
+                    'rentang_tanggal' => [$tanggalMulai, $tanggalSelesai],
+                    'pesan' => $e->getMessage(),
+                ]);
                 $dataBridge = null; // null = gagal fetch, bukan "kosong beneran"
             }
 

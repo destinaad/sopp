@@ -73,9 +73,8 @@ function validasiRincianEdit(rincian) {
       // Ikut BE (validateEntries): foto WAJIB hanya untuk baris BARU (tanpa
       // entryId). Baris lama non-kpay foto-nya `nullable` di BE -- kalau tidak
       // mengirim file, foto lama dipertahankan, dan kalau memang belum pernah
-      // ada foto, tetap boleh disimpan. (Wajib-foto untuk baris yang pindah
-      // dari kpay tidak perlu dicek di sini: UI tidak punya kontrol untuk
-      // mengubah metode baris yang sudah ada.)
+      // ada foto, tetap boleh disimpan. (Kasus pindah dari KPay ke non-KPay tanpa
+      // foto ditolak langsung oleh BE dengan 422 dan ditampilkan lewat uraikanErrorApi.)
       errors.push(`${label} baris ke-${i + 1}: bukti wajib diunggah.`);
     }
   });
@@ -273,7 +272,7 @@ export default function DetailSetoran() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 w-full items-start">
+      <div className={`grid grid-cols-1 ${mode === "edit" ? "lg:grid-cols-1" : "lg:grid-cols-[1fr_360px]"} gap-5 w-full items-start`}>
         <div className="flex flex-col gap-5">
           {/* Total Pendapatan TETAP read-only apa pun mode-nya — data otomatis dari sistem SOPP */}
           <PendapatanTable
@@ -301,7 +300,11 @@ export default function DetailSetoran() {
 
         <div className="flex flex-col gap-5">
           {mode === "edit" ? (
-            <RincianSetoran initialData={initialRincian} onRowsChange={setRincianEdit} />
+            <RincianSetoran
+              initialData={initialRincian}
+              onRowsChange={setRincianEdit}
+              bisaGantiMetode
+            />
           ) : (
             <RincianLampiran entries={detail.entries} />
           )}

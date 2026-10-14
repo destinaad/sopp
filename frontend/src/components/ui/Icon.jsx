@@ -2,13 +2,6 @@ import svgPaths from "@/imports/DashboardTeller/svg-9h9frko7hs";
 import svgPathsInputSetoran from "@/imports/InputSetoran/svg-n4hklf8pmm";
 import svgPathsHakAkses from "@/imports/HakAkses/svg-7193nglv2x";
 
-// Semua icon dikumpulkan di satu file supaya gampang dicari & tidak duplikat
-// antar halaman/komponen. Kalau ke depan icon-nya banyak sekali (>20), boleh
-// dipecah lagi per kategori (mis. IconsNav.jsx, IconsAction.jsx).
-//
-// NOTE: tiap halaman hasil export Figma Make punya file data path SVG sendiri
-// (svgPaths beda-beda per frame), makanya di sini kita import lebih dari satu
-// modul svgPaths dengan nama alias yang beda (svgPaths, svgPathsInputSetoran, dst).
 
 export function IconDashboard() {
   return (
@@ -30,14 +23,6 @@ export function IconHistory() {
   return (
     <svg className="shrink-0 size-[18px]" fill="none" viewBox="0 0 18 18">
       <path d={svgPaths.p22876fc0} fill="currentColor" />
-    </svg>
-  );
-}
-
-export function IconSearch() {
-  return (
-    <svg className="shrink-0 size-[34px]" fill="none" viewBox="0 0 34 34">
-      <path d={svgPaths.p266e0b00} fill="#424751" />
     </svg>
   );
 }
@@ -115,7 +100,6 @@ export function IconMenu() {
   );
 }
 
-// ─── Icon khusus halaman Input Setoran ─────────────────────────────────────
 
 export function IconCalendar({ className = "shrink-0 size-5", color = "#710014" }) {
   return (
@@ -125,8 +109,6 @@ export function IconCalendar({ className = "shrink-0 size-5", color = "#710014" 
   );
 }
 
-// Namanya IconClockHistory (bukan IconHistory) supaya tidak bentrok dengan
-// IconHistory yang sudah dipakai di Sidebar untuk menu "Riwayat Setoran".
 export function IconClockHistory() {
   return (
     <svg className="shrink-0 size-6" fill="none" viewBox="0 0 24 24">
@@ -183,14 +165,6 @@ export function IconUpload({ className = "shrink-0 h-5 w-4", color = "#424751" }
   );
 }
 
-export function IconCamera() {
-  return (
-    <svg className="shrink-0 h-5 w-[22px]" fill="none" viewBox="0 0 22 20">
-      <path d={svgPathsInputSetoran.p31d16a00} fill="#424751" />
-    </svg>
-  );
-}
-
 export function IconBadgeCheck() {
   return (
     <svg className="shrink-0 size-[15px]" fill="none" viewBox="0 0 15 15">
@@ -223,8 +197,6 @@ export function IconKpay({ className = "shrink-0 size-5", color = "#424751" }) {
   );
 }
 
-// Icon checklist pojok kanan atas Card A (dipakai inline di dalam OptionCards,
-// khusus untuk badge kecil di pojok kartu yang sedang aktif dipilih)
 export function IconCardCheckCorner() {
   return (
     <svg className="size-4" fill="none" viewBox="0 0 24.667 30.667">
@@ -242,9 +214,6 @@ export function IconClockSmall() {
   );
 }
 
-// [PELUNASAN] Panah panjang pemisah "sisa sebelumnya" -> "jumlah diinput".
-// Ini BUKAN dari svgPaths Figma (path generik gaya Heroicons), makanya
-// ditulis langsung sebagai path SVG biasa, bukan svgPaths.xxx.
 export function IconArrowLong() {
   return (
     <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,7 +222,6 @@ export function IconArrowLong() {
   );
 }
 
-// ─── Icon Riwayat Setoran ───────────────────────────────────────────────────
 
 export function IconMagnifier({ className = "size-4", color = "currentColor" }) {
   return (
@@ -320,7 +288,6 @@ export function IconWarningTriangle({ className = "size-6", color = "currentColo
   );
 }
 
-// ─── Icon Detail Setoran ────────────────────────────────────────────────────
 
 export function IconBuilding({ className = "size-4", color = "currentColor" }) {
   return (
@@ -367,7 +334,6 @@ export function IconShieldOutline({ className = "size-8", color = "currentColor"
   );
 }
 
-// ─── Icon Ganti Password ────────────────────────────────────────────────────
  
 export function IconEyeOff({ className = "size-5", color = "currentColor" }) {
   return (
@@ -394,7 +360,6 @@ export function IconCheckCircleFilled({ className = "size-6", color = "#16A34A" 
   );
 }
 
-// ─── Icon Login & Dashboard Super Admin ─────────────────────────────────────
  
 export function IconRefresh({ className = "size-4", color = "currentColor" }) {
   return (
@@ -417,22 +382,6 @@ export function IconShieldCheck({ className = "size-6", color = "currentColor" }
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke={color}>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75l1.5 1.5 4.5-4.5M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
-    </svg>
-  );
-}
-
-export function IconAdminDashboard() {
-  return (
-    <svg className="shrink-0 size-[18px]" fill="none" viewBox="0 0 18 18">
-      <path d={svgPathsHakAkses.p191dcc80} fill="currentColor" />
-    </svg>
-  );
-}
-
-export function IconAdminLaporan() {
-  return (
-    <svg className="shrink-0 h-5 w-[21px]" fill="none" viewBox="0 0 21 20">
-      <path d={svgPathsHakAkses.p19bda00} fill="currentColor" />
     </svg>
   );
 }

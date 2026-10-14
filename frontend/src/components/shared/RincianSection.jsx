@@ -22,6 +22,9 @@ export default function RincianSection({
   onToggleVerified,
   onDelete,
   emptyMessage,
+  readOnly = false,
+  metode,
+  onMetodeChange,
 }) {
   const subtotal = rows.reduce((sum, r) => sum + (parseInt(r.nominal, 10) || 0), 0);
 
@@ -34,7 +37,8 @@ export default function RincianSection({
         </span>
       </div>
 
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col gap-2 p-4 overflow-x-auto">
+        <div className="min-w-[620px] flex flex-col gap-2">
         {rows.length === 0 && emptyMessage ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <p className="text-[#424751] text-base">
@@ -51,14 +55,20 @@ export default function RincianSection({
               onBuktiChange={(v) => onBuktiChange(row.id, v)}
               onToggleVerified={() => onToggleVerified(row.id)}
               onDelete={() => onDelete(row.id)}
+              readOnly={readOnly}
+              metode={metode}
+              onMetodeChange={onMetodeChange ? (ke) => onMetodeChange(row.id, ke) : undefined}
             />
           ))
         )}
 
-        <button onClick={onAdd} className="flex gap-1 items-center text-base" style={{ color: addColor }}>
-          <IconPlus />
-          <span>{addLabel}</span>
-        </button>
+        {!readOnly && (
+          <button onClick={onAdd} className="flex gap-1 items-center text-base" style={{ color: addColor }}>
+            <IconPlus />
+            <span>{addLabel}</span>
+          </button>
+        )}
+        </div>
       </div>
     </div>
   );

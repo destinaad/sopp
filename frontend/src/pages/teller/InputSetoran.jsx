@@ -143,27 +143,24 @@ export default function InputSetoran() {
   const [toastMessage, setToastMessage] = useState(null);
  
   const [draftDisimpan, setDraftDisimpan] = useState(null);
-  const [formData, setFormData] = useState(null); // hasil GET /teller/setoran
+  const [formData, setFormData] = useState(null);
   const [loadingForm, setLoadingForm] = useState(true);
 
   const [tanggal, setTanggal] = useState(tanggalDraft ?? todayISO());
   const [kalenderMap, setKalenderMap] = useState({});
   const [versiForm, setVersiForm] = useState(0);
 
-  // Dropdown loket: hanya untuk user dengan kapabilitas input semua loket.
   const user = useAuthStore((s) => s.user);
   const bisaSemuaLoket = user?.bisa_input_setoran_semua_loket === true;
   const [loketList, setLoketList] = useState([]);
-  const [loketId, setLoketId] = useState(""); // "" = loket bawaan akun
+  const [loketId, setLoketId] = useState("");
   const bulanAktifRef = useRef(null);
   const loketPertamaRender = useRef(true);
 
-  // Params loket: kosong kalau bukan user multi-loket atau belum memilih.
   const loketParams = bisaSemuaLoket && loketId ? { loket_id: loketId } : {};
 
   const { loading, saveDraft, submit, fetchForm, fetchKalender } = useInputSetoran();
 
-  // Ambil daftar loket sekali, hanya kalau user berhak.
   useEffect(() => {
     if (!bisaSemuaLoket) return;
     getLokets()
@@ -171,7 +168,6 @@ export default function InputSetoran() {
       .catch(() => setLoketList([]));
   }, [bisaSemuaLoket]);
 
-  // Ambil state form dari server tiap kali tanggal atau loket berganti.
   useEffect(() => {
     let batal = false;
     async function muatForm() {
@@ -189,10 +185,8 @@ export default function InputSetoran() {
     }
     muatForm();
     return () => { batal = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tanggal, loketId]);
 
-  // Ambil status kalender untuk bulan yang sedang ditampilkan di picker.
   const muatKalender = useCallback(async (bulanStr) => {
     try {
       const params = { bulan: bulanStr };
@@ -204,7 +198,6 @@ export default function InputSetoran() {
       }
       setKalenderMap(map);
     } catch {
-      // Kalender gagal dimuat bukan blocker untuk input setoran; silent-fail.
     }
   }, [fetchKalender, bisaSemuaLoket, loketId]);
 
@@ -213,8 +206,6 @@ export default function InputSetoran() {
     muatKalender(bulanStr);
   };
 
-  // Ganti loket -> kosongkan form lama dan muat ulang kalender loket baru.
-  // Dilewati saat render pertama supaya data draft dari Riwayat tidak terhapus.
   useEffect(() => {
     if (loketPertamaRender.current) {
       loketPertamaRender.current = false;
@@ -229,8 +220,6 @@ export default function InputSetoran() {
   const pendapatanGagalDimuat = formData?.pendapatan_sopp_status === "gagal_dimuat";
   const totalPendapatanSOPP = formData?.total_pendapatan ?? null;
   const isLocked = formData?.is_locked === true;
-
-  // Selisih di FE hanya preview live; angka resmi dari respons BE.
   const selisih = formData?.selisih ?? null;
 
   const [refreshing, setRefreshing] = useState(false);
@@ -381,6 +370,7 @@ export default function InputSetoran() {
                 initialData={formData?.entries?.length ? rincian : undefined}
                 onTotalChange={setTotalSetor}
                 onRowsChange={setRincian}
+                readOnly={isLocked}
               />
               <RingkasanOtomatis totalSetor={totalSetor} totalPendapatanSOPP={totalPendapatanSOPP} selisih={selisih} />
 
